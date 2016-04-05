@@ -248,8 +248,7 @@ static bool fsl_mc_is_root_dprc(struct device *dev)
 	fsl_mc_get_root_dprc(dev, &root_dprc_dev);
 	if (!root_dprc_dev)
 		return false;
-	else
-		return dev == root_dprc_dev;
+	return dev == root_dprc_dev;
 }
 
 static int get_dprc_icid(struct fsl_mc_io *mc_io,
@@ -795,7 +794,6 @@ MODULE_DEVICE_TABLE(of, fsl_mc_bus_match_table);
 static struct platform_driver fsl_mc_bus_driver = {
 	.driver = {
 		   .name = "fsl_mc_bus",
-		   .owner = THIS_MODULE,
 		   .pm = NULL,
 		   .of_match_table = fsl_mc_bus_match_table,
 		   },

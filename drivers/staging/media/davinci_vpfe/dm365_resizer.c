@@ -1387,8 +1387,9 @@ resizer_try_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *cfg,
  * @fmt: pointer to v4l2 subdev format structure
  * return -EINVAL or zero on success
  */
-static int resizer_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *cfg,
-			   struct v4l2_subdev_format *fmt)
+static int resizer_set_format(struct v4l2_subdev *sd,
+			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_format *fmt)
 {
 	struct vpfe_resizer_device *resizer = v4l2_get_subdevdata(sd);
 	struct v4l2_mbus_framefmt *format;
@@ -1447,8 +1448,9 @@ static int resizer_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_con
  * @fmt: pointer to v4l2 subdev format structure
  * return -EINVAL or zero on success
  */
-static int resizer_get_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config *cfg,
-			   struct v4l2_subdev_format *fmt)
+static int resizer_get_format(struct v4l2_subdev *sd,
+			      struct v4l2_subdev_pad_config *cfg,
+			      struct v4l2_subdev_format *fmt)
 {
 	struct v4l2_mbus_framefmt *format;
 
@@ -1670,7 +1672,7 @@ static int resizer_link_setup(struct media_entity *entity,
 				resizer->crop_resizer.input =
 						RESIZER_CROP_INPUT_IPIPEIF;
 			else if (ipipe_source == IPIPE_OUTPUT_RESIZER)
-					resizer->crop_resizer.input =
+				resizer->crop_resizer.input =
 						RESIZER_CROP_INPUT_IPIPE;
 			else
 				return -EINVAL;

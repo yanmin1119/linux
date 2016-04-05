@@ -37,6 +37,7 @@
 #define DEBUG_SUBSYSTEM S_LNET
 
 #include "selftest.h"
+#include "console.h"
 
 enum {
 	LST_INIT_NONE = 0,
@@ -47,16 +48,13 @@ enum {
 	LST_INIT_CONSOLE
 };
 
-extern int lstcon_console_init(void);
-extern int lstcon_console_fini(void);
-
 static int lst_init_step = LST_INIT_NONE;
 
 struct cfs_wi_sched *lst_sched_serial;
 struct cfs_wi_sched **lst_sched_test;
 
 static void
-lnet_selftest_fini(void)
+lnet_selftest_exit(void)
 {
 	int i;
 
@@ -146,13 +144,14 @@ lnet_selftest_init(void)
 	lst_init_step = LST_INIT_CONSOLE;
 	return 0;
 error:
-	lnet_selftest_fini();
+	lnet_selftest_exit();
 	return rc;
 }
 
+MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
 MODULE_DESCRIPTION("LNet Selftest");
+MODULE_VERSION("2.7.0");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("0.9.0");
 
 module_init(lnet_selftest_init);
-module_exit(lnet_selftest_fini);
+module_exit(lnet_selftest_exit);

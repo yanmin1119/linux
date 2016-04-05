@@ -270,7 +270,6 @@ parse_nidrange(struct cfs_lstr *src, struct list_head *nidlist)
 
 	return 1;
 failed:
-	CWARN("can't parse nidrange: \"%.*s\"\n", tmp.ls_len, tmp.ls_str);
 	return 0;
 }
 
@@ -1085,7 +1084,7 @@ libcfs_str2lnd(const char *str)
 	if (nf)
 		return nf->nf_type;
 
-	return -1;
+	return -ENXIO;
 }
 EXPORT_SYMBOL(libcfs_str2lnd);
 

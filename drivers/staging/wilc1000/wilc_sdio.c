@@ -30,15 +30,15 @@ static const struct sdio_device_id wilc_sdio_ids[] = {
 
 #define WILC_SDIO_BLOCK_SIZE 512
 
-typedef struct {
+struct wilc_sdio {
 	bool irq_gpio;
 	u32 block_size;
 	int nint;
 #define MAX_NUN_INT_THRPT_ENH2 (5) /* Max num interrupts allowed in registers 0xf7, 0xf8 */
 	int has_thrpt_enh3;
-} wilc_sdio_t;
+};
 
-static wilc_sdio_t g_sdio;
+static struct wilc_sdio g_sdio;
 
 static int sdio_write_reg(struct wilc *wilc, u32 addr, u32 data);
 static int sdio_read_reg(struct wilc *wilc, u32 addr, u32 *data);
@@ -51,7 +51,7 @@ static void wilc_sdio_interrupt(struct sdio_func *func)
 	sdio_claim_host(func);
 }
 
-static int wilc_sdio_cmd52(struct wilc *wilc, sdio_cmd52_t *cmd)
+static int wilc_sdio_cmd52(struct wilc *wilc, struct sdio_cmd52 *cmd)
 {
 	struct sdio_func *func = container_of(wilc->dev, struct sdio_func, dev);
 	int ret;
@@ -81,7 +81,7 @@ static int wilc_sdio_cmd52(struct wilc *wilc, sdio_cmd52_t *cmd)
 }
 
 
-static int wilc_sdio_cmd53(struct wilc *wilc, sdio_cmd53_t *cmd)
+static int wilc_sdio_cmd53(struct wilc *wilc, struct sdio_cmd53 *cmd)
 {
 	struct sdio_func *func = container_of(wilc->dev, struct sdio_func, dev);
 	int size, ret;
@@ -145,7 +145,7 @@ static void linux_sdio_remove(struct sdio_func *func)
 
 static int sdio_reset(struct wilc *wilc)
 {
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 	int ret;
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 
@@ -266,7 +266,7 @@ static void wilc_sdio_disable_interrupt(struct wilc *dev)
 static int sdio_set_func0_csa_address(struct wilc *wilc, u32 adr)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 	int ret;
 
 	/**
@@ -307,7 +307,7 @@ _fail_:
 static int sdio_set_func0_block_size(struct wilc *wilc, u32 block_size)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 	int ret;
 
 	cmd.read_write = 1;
@@ -343,7 +343,7 @@ _fail_:
 static int sdio_set_func1_block_size(struct wilc *wilc, u32 block_size)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 	int ret;
 
 	cmd.read_write = 1;
@@ -382,7 +382,7 @@ static int sdio_write_reg(struct wilc *wilc, u32 addr, u32 data)
 	data = cpu_to_le32(data);
 
 	if ((addr >= 0xf0) && (addr <= 0xff)) {
-		sdio_cmd52_t cmd;
+		struct sdio_cmd52 cmd;
 
 		cmd.read_write = 1;
 		cmd.function = 0;
@@ -396,7 +396,7 @@ static int sdio_write_reg(struct wilc *wilc, u32 addr, u32 data)
 			goto _fail_;
 		}
 	} else {
-		sdio_cmd53_t cmd;
+		struct sdio_cmd53 cmd;
 
 		/**
 		 *      set the AHB address
@@ -431,7 +431,7 @@ static int sdio_write(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 	u32 block_size = g_sdio.block_size;
-	sdio_cmd53_t cmd;
+	struct sdio_cmd53 cmd;
 	int nblk, nleft, ret;
 
 	cmd.read_write = 1;
@@ -522,7 +522,7 @@ static int sdio_read_reg(struct wilc *wilc, u32 addr, u32 *data)
 	int ret;
 
 	if ((addr >= 0xf0) && (addr <= 0xff)) {
-		sdio_cmd52_t cmd;
+		struct sdio_cmd52 cmd;
 
 		cmd.read_write = 0;
 		cmd.function = 0;
@@ -536,7 +536,7 @@ static int sdio_read_reg(struct wilc *wilc, u32 addr, u32 *data)
 		}
 		*data = cmd.data;
 	} else {
-		sdio_cmd53_t cmd;
+		struct sdio_cmd53 cmd;
 
 		if (!sdio_set_func0_csa_address(wilc, addr))
 			goto _fail_;
@@ -571,7 +571,7 @@ static int sdio_read(struct wilc *wilc, u32 addr, u8 *buf, u32 size)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 	u32 block_size = g_sdio.block_size;
-	sdio_cmd53_t cmd;
+	struct sdio_cmd53 cmd;
 	int nblk, nleft, ret;
 
 	cmd.read_write = 0;
@@ -670,12 +670,12 @@ static int sdio_deinit(struct wilc *wilc)
 static int sdio_init(struct wilc *wilc, bool resume)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 	int loop, ret;
 	u32 chipid;
 
 	if (!resume) {
-		memset(&g_sdio, 0, sizeof(wilc_sdio_t));
+		memset(&g_sdio, 0, sizeof(struct wilc_sdio));
 		g_sdio.irq_gpio = wilc->dev_irq_num;
 	}
 
@@ -791,7 +791,7 @@ _fail_:
 static int sdio_read_size(struct wilc *wilc, u32 *size)
 {
 	u32 tmp;
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 
 	/**
 	 *      Read DMA count in words
@@ -820,7 +820,7 @@ static int sdio_read_int(struct wilc *wilc, u32 *int_status)
 {
 	struct sdio_func *func = dev_to_sdio_func(wilc->dev);
 	u32 tmp;
-	sdio_cmd52_t cmd;
+	struct sdio_cmd52 cmd;
 
 	sdio_read_size(wilc, &tmp);
 
@@ -899,7 +899,7 @@ static int sdio_clear_int_ext(struct wilc *wilc, u32 val)
 		if ((val & EN_VMM) == EN_VMM)
 			reg |= BIT(7);
 		if (reg) {
-			sdio_cmd52_t cmd;
+			struct sdio_cmd52 cmd;
 
 			cmd.read_write = 1;
 			cmd.function = 0;
@@ -929,7 +929,7 @@ static int sdio_clear_int_ext(struct wilc *wilc, u32 val)
 				ret = 1;
 				for (i = 0; i < g_sdio.nint; i++) {
 					if (flags & 1) {
-						sdio_cmd52_t cmd;
+						struct sdio_cmd52 cmd;
 
 						cmd.read_write = 1;
 						cmd.function = 0;
@@ -977,7 +977,7 @@ static int sdio_clear_int_ext(struct wilc *wilc, u32 val)
 				vmm_ctl |= BIT(2);
 
 			if (vmm_ctl) {
-				sdio_cmd52_t cmd;
+				struct sdio_cmd52 cmd;
 
 				cmd.read_write = 1;
 				cmd.function = 0;

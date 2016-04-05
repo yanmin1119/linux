@@ -178,10 +178,8 @@ static inline void get_ssid(u8 *data, u8 *ssid, u8 *p_ssid_len)
 	u8 i   = 0;
 	u8 j   = 0;
 
-	len = data[MAC_HDR_LEN + TIME_STAMP_LEN + BEACON_INTERVAL_LEN +
-		   CAP_INFO_LEN + 1];
-	j   = MAC_HDR_LEN + TIME_STAMP_LEN + BEACON_INTERVAL_LEN +
-		CAP_INFO_LEN + 2;
+	len = data[TAG_PARAM_OFFSET + 1];
+	j   = TAG_PARAM_OFFSET + 2;
 
 	if (len >= MAX_SSID_LEN)
 		len = 0;
@@ -284,10 +282,8 @@ s32 wilc_parse_network_info(u8 *msg_buffer,
 
 	msg_type = msg_buffer[0];
 
-	if ('N' != msg_type) {
-		PRINT_ER("Received Message format incorrect.\n");
+	if ('N' != msg_type)
 		return -EFAULT;
-	}
 
 	msg_id = msg_buffer[1];
 	msg_len = MAKE_WORD16(msg_buffer[2], msg_buffer[3]);
@@ -337,10 +333,8 @@ s32 wilc_parse_network_info(u8 *msg_buffer,
 		tim_elm = get_tim_elm(msa, rx_len + FCS_LEN, index);
 		if (tim_elm)
 			network_info->dtim_period = tim_elm[3];
-		ies = &msa[MAC_HDR_LEN + TIME_STAMP_LEN + BEACON_INTERVAL_LEN +
-			   CAP_INFO_LEN];
-		ies_len = rx_len - (MAC_HDR_LEN + TIME_STAMP_LEN +
-				    BEACON_INTERVAL_LEN + CAP_INFO_LEN);
+		ies = &msa[TAG_PARAM_OFFSET];
+		ies_len = rx_len - TAG_PARAM_OFFSET;
 
 		if (ies_len > 0) {
 			network_info->ies = kmemdup(ies, ies_len, GFP_KERNEL);

@@ -1,9 +1,14 @@
+#include <linux/kernel.h>
 #include <linux/sizes.h>
 
 #include "ddk750_help.h"
 #include "ddk750_reg.h"
 #include "ddk750_chip.h"
 #include "ddk750_power.h"
+
+/* n / d + 1 / 2 = (2n + d) / 2d */
+#define roundedDiv(num, denom)	((2 * (num) + (denom)) / (2 * (denom)))
+#define MHz(x) ((x) * 1000000)
 
 logical_chip_type_t getChipType(void)
 {
@@ -335,7 +340,7 @@ unsigned int calcPllValue(unsigned int request_orig, pll_value_t *pll)
 				unsigned int diff;
 
 				tmpClock = pll->inputFreq * M / N / X;
-				diff = absDiff(tmpClock, request_orig);
+				diff = abs(tmpClock - request_orig);
 				if (diff < mini_diff) {
 					pll->M = M;
 					pll->N = N;

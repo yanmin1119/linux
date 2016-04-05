@@ -13,11 +13,6 @@
  * General Public License version 2 for more details (a copy is included
  * in the LICENSE file that accompanied this code).
  *
- * You should have received a copy of the GNU General Public License
- * version 2 along with this program; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 021110-1307, USA
- *
  * GPL HEADER END
  */
 /* Copyright (c) 2010, Oracle and/or its affiliates. All rights reserved.
@@ -38,7 +33,7 @@
 void
 cfs_percpt_lock_free(struct cfs_percpt_lock *pcl)
 {
-	LASSERT(pcl->pcl_locks != NULL);
+	LASSERT(pcl->pcl_locks);
 	LASSERT(!pcl->pcl_locked);
 
 	cfs_percpt_free(pcl->pcl_locks);
@@ -115,7 +110,8 @@ cfs_percpt_lock(struct cfs_percpt_lock *pcl, int index)
 		if (i == 0) {
 			LASSERT(!pcl->pcl_locked);
 			/* nobody should take private lock after this
-			 * so I wouldn't starve for too long time */
+			 * so I wouldn't starve for too long time
+			 */
 			pcl->pcl_locked = 1;
 		}
 	}

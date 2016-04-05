@@ -38,7 +38,6 @@
 #include <linux/kthread.h>
 #include <linux/uio.h>
 #include <linux/types.h>
-#include <net/sock.h>
 
 #include "types.h"
 
@@ -285,6 +284,7 @@ typedef struct lnet_ni {
 #define LNET_PING_FEAT_INVAL		(0)		/* no feature */
 #define LNET_PING_FEAT_BASE		(1 << 0)	/* just a ping */
 #define LNET_PING_FEAT_NI_STATUS	(1 << 1)	/* return NI status */
+#define LNET_PING_FEAT_RTE_DISABLED	(1 << 2)	/* Routing enabled */
 
 #define LNET_PING_FEAT_MASK		(LNET_PING_FEAT_BASE | \
 					 LNET_PING_FEAT_NI_STATUS)
@@ -351,6 +351,8 @@ typedef struct lnet_peer {
 struct lnet_peer_table {
 	int			 pt_version;	/* /proc validity stamp */
 	int			 pt_number;	/* # peers extant */
+	/* # zombies to go to deathrow (and not there yet) */
+	int			 pt_zombies;
 	struct list_head	 pt_deathrow;	/* zombie peers */
 	struct list_head	*pt_hash;	/* NID->peer hash */
 };
@@ -369,7 +371,7 @@ typedef struct {
 	__u32			 lr_net;	/* remote network number */
 	int			 lr_seq;	/* sequence for round-robin */
 	unsigned int		 lr_downis;	/* number of down NIs */
-	unsigned int		 lr_hops;	/* how far I am */
+	__u32			 lr_hops;	/* how far I am */
 	unsigned int             lr_priority;	/* route priority */
 } lnet_route_t;
 
@@ -394,7 +396,10 @@ typedef struct {
 	struct list_head	rbp_msgs;	/* messages blocking
 						   for a buffer */
 	int			rbp_npages;	/* # pages in each buffer */
-	int			rbp_nbuffers;	/* # buffers */
+	/* requested number of buffers */
+	int			rbp_req_nbuffers;
+	/* # buffers actually allocated */
+	int			rbp_nbuffers;
 	int			rbp_credits;	/* # free buffers /
 						     blocked messages */
 	int			rbp_mincredits;	/* low water mark */
@@ -408,7 +413,12 @@ typedef struct {
 
 #define LNET_PEER_HASHSIZE	503	/* prime! */
 
-#define LNET_NRBPOOLS		3	/* # different router buffer pools */
+#define LNET_TINY_BUF_IDX	0
+#define LNET_SMALL_BUF_IDX	1
+#define LNET_LARGE_BUF_IDX	2
+
+/* # different router buffer pools */
+#define LNET_NRBPOOLS		(LNET_LARGE_BUF_IDX + 1)
 
 enum {
 	/* Didn't match anything */
@@ -569,8 +579,6 @@ typedef struct {
 	/* dying LND instances */
 	struct list_head		  ln_nis_zombie;
 	lnet_ni_t			 *ln_loni;	/* the loopback NI */
-	/* NI to wait for events in */
-	lnet_ni_t			 *ln_eq_waitni;
 
 	/* remote networks with routes to them */
 	struct list_head		 *ln_remote_nets_hash;
@@ -600,8 +608,6 @@ typedef struct {
 
 	struct mutex			  ln_api_mutex;
 	struct mutex			  ln_lnd_mutex;
-	int				  ln_init;	/* lnet_init()
-							   called? */
 	/* Have I called LNetNIInit myself? */
 	int				  ln_niinit_self;
 	/* LNetNIInit/LNetNIFini counter */
@@ -616,11 +622,23 @@ typedef struct {
 	/* registered LNDs */
 	struct list_head		  ln_lnds;
 
-	/* space for network names */
-	char				 *ln_network_tokens;
-	int				  ln_network_tokens_nob;
 	/* test protocol compatibility flags */
 	int				  ln_testprotocompat;
+
+	/*
+	 * 0 - load the NIs from the mod params
+	 * 1 - do not load the NIs from the mod params
+	 * Reverse logic to ensure that other calls to LNetNIInit
+	 * need no change
+	 */
+	bool				  ln_nis_from_mod_params;
+
+	/*
+	 * waitq for router checker.  As long as there are no routes in
+	 * the list, the router checker will sleep on this queue.  when
+	 * routes are added the thread will wake up
+	 */
+	wait_queue_head_t		  ln_rc_waitq;
 
 } lnet_t;
 

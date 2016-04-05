@@ -102,6 +102,7 @@ ksocknal_destroy_route(ksock_route_t *route)
 static int
 ksocknal_create_peer(ksock_peer_t **peerp, lnet_ni_t *ni, lnet_process_id_t id)
 {
+	int cpt = lnet_cpt_of_nid(id.nid);
 	ksock_net_t *net = ni->ni_data;
 	ksock_peer_t *peer;
 
@@ -109,7 +110,7 @@ ksocknal_create_peer(ksock_peer_t **peerp, lnet_ni_t *ni, lnet_process_id_t id)
 	LASSERT(id.pid != LNET_PID_ANY);
 	LASSERT(!in_interrupt());
 
-	LIBCFS_ALLOC(peer, sizeof(*peer));
+	LIBCFS_CPT_ALLOC(peer, lnet_cpt_table(), cpt, sizeof(*peer));
 	if (!peer)
 		return -ENOMEM;
 
@@ -803,6 +804,8 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
 			ip = peer->ksnp_passive_ips[i];
 			best_iface = ksocknal_ip2iface(peer->ksnp_ni, ip);
 
+			/* peer passive ips are kept up to date */
+			LASSERT(best_iface);
 		} else {
 			/* choose a new interface */
 			LASSERT(i == peer->ksnp_n_passive_ips);
@@ -836,6 +839,8 @@ ksocknal_select_ips(ksock_peer_t *peer, __u32 *peerips, int n_peerips)
 				best_netmatch = this_netmatch;
 				best_npeers = iface->ksni_npeers;
 			}
+
+			LASSERT(best_iface);
 
 			best_iface->ksni_npeers++;
 			ip = best_iface->ksni_ipaddr;
@@ -1842,7 +1847,10 @@ ksocknal_query(lnet_ni_t *ni, lnet_nid_t nid, unsigned long *when)
 	unsigned long now = cfs_time_current();
 	ksock_peer_t *peer = NULL;
 	rwlock_t *glock = &ksocknal_data.ksnd_global_lock;
-	lnet_process_id_t id = {.nid = nid, .pid = LUSTRE_SRV_LNET_PID};
+	lnet_process_id_t id = {
+		.nid = nid,
+		.pid = LNET_PID_LUSTRE,
+	};
 
 	read_lock(glock);
 
@@ -2187,7 +2195,7 @@ ksocknal_ctl(lnet_ni_t *ni, unsigned int cmd, void *arg)
 
 	case IOC_LIBCFS_ADD_PEER:
 		id.nid = data->ioc_nid;
-		id.pid = LUSTRE_SRV_LNET_PID;
+		id.pid = LNET_PID_LUSTRE;
 		return ksocknal_add_peer(ni, id,
 					  data->ioc_u32[0], /* IP */
 					  data->ioc_u32[1]); /* port */
@@ -2886,14 +2894,12 @@ ksocknal_startup(lnet_ni_t *ni)
 	return -ENETDOWN;
 }
 
-static void __exit
-ksocknal_module_fini(void)
+static void __exit ksocklnd_exit(void)
 {
 	lnet_unregister_lnd(&the_ksocklnd);
 }
 
-static int __init
-ksocknal_module_init(void)
+static int __init ksocklnd_init(void)
 {
 	int rc;
 
@@ -2922,9 +2928,9 @@ ksocknal_module_init(void)
 }
 
 MODULE_AUTHOR("OpenSFS, Inc. <http://www.lustre.org/>");
-MODULE_DESCRIPTION("Kernel TCP Socket LND v3.0.0");
+MODULE_DESCRIPTION("TCP Socket LNet Network Driver");
+MODULE_VERSION("2.7.0");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("3.0.0");
 
-module_init(ksocknal_module_init);
-module_exit(ksocknal_module_fini);
+module_init(ksocklnd_init);
+module_exit(ksocklnd_exit);

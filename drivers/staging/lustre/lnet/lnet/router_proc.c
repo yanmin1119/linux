@@ -15,10 +15,6 @@
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *   GNU General Public License for more details.
  *
- *   You should have received a copy of the GNU General Public License
- *   along with Portals; if not, write to the Free Software
- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
  */
 
 #define DEBUG_SUBSYSTEM S_LNET
@@ -239,10 +235,10 @@ static int proc_lnet_routes(struct ctl_table *table, int write,
 
 		if (route) {
 			__u32 net = rnet->lrn_net;
-			unsigned int hops = route->lr_hops;
+			__u32 hops = route->lr_hops;
 			unsigned int priority = route->lr_priority;
 			lnet_nid_t nid = route->lr_gateway->lp_nid;
-			int alive = route->lr_gateway->lp_alive;
+			int alive = lnet_is_route_alive(route);
 
 			s += snprintf(s, tmpstr + tmpsiz - s,
 				      "%-8s %4u %8u %7s %s\n",
@@ -803,8 +799,6 @@ static struct lnet_portal_rotors	portal_rotors[] = {
 		.pr_desc  = NULL
 	},
 };
-
-extern int portal_rotor;
 
 static int __proc_lnet_portal_rotor(void *data, int write,
 				    loff_t pos, void __user *buffer, int nob)

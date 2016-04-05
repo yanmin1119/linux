@@ -59,7 +59,6 @@
 #include <linux/highmem.h>
 #include <linux/io.h>
 #include <asm/ioctls.h>
-#include <linux/poll.h>
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
 #include <linux/seq_file.h>
@@ -71,7 +70,6 @@
 #include "../../include/obd_class.h"
 #include "../../include/lprocfs_status.h"
 #include "../../include/lustre_ver.h"
-#include "../../include/lustre/lustre_build_version.h"
 
 /* buffer MUST be at least the size of obd_ioctl_hdr */
 int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
@@ -104,9 +102,10 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
 	/* When there are lots of processes calling vmalloc on multi-core
 	 * system, the high lock contention will hurt performance badly,
 	 * obdfilter-survey is an example, which relies on ioctl. So we'd
-	 * better avoid vmalloc on ioctl path. LU-66 */
+	 * better avoid vmalloc on ioctl path. LU-66
+	 */
 	*buf = libcfs_kvzalloc(hdr.ioc_len, GFP_NOFS);
-	if (*buf == NULL) {
+	if (!*buf) {
 		CERROR("Cannot allocate control buffer of len %d\n",
 		       hdr.ioc_len);
 		return -EINVAL;
@@ -454,8 +453,7 @@ out:
 
 int class_procfs_clean(void)
 {
-	if (debugfs_lustre_root != NULL)
-		debugfs_remove_recursive(debugfs_lustre_root);
+	debugfs_remove_recursive(debugfs_lustre_root);
 
 	debugfs_lustre_root = NULL;
 

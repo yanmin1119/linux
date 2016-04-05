@@ -282,7 +282,8 @@ isif_config_format(struct vpfe_device *vpfe_dev, unsigned int pad)
  * @fmt: pointer to v4l2 subdev format structure
  */
 static void
-isif_try_format(struct vpfe_isif_device *isif, struct v4l2_subdev_pad_config *cfg,
+isif_try_format(struct vpfe_isif_device *isif,
+		struct v4l2_subdev_pad_config *cfg,
 		struct v4l2_subdev_format *fmt)
 {
 	unsigned int width = fmt->format.width;
@@ -625,21 +626,16 @@ static int isif_set_params(struct v4l2_subdev *sd, void *params)
  */
 static long isif_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
-	int ret;
-
 	switch (cmd) {
 	case VIDIOC_VPFE_ISIF_S_RAW_PARAMS:
-		ret = isif_set_params(sd, arg);
-		break;
+		return isif_set_params(sd, arg);
 
 	case VIDIOC_VPFE_ISIF_G_RAW_PARAMS:
-		ret = isif_get_params(sd, arg);
-		break;
+		return isif_get_params(sd, arg);
 
 	default:
-		ret = -ENOIOCTLCMD;
+		return -ENOIOCTLCMD;
 	}
-	return ret;
 }
 
 static void isif_config_gain_offset(struct vpfe_isif_device *isif)
@@ -1399,8 +1395,9 @@ static int isif_set_stream(struct v4l2_subdev *sd, int enable)
  * @which: wanted subdev format.
  */
 static struct v4l2_mbus_framefmt *
-__isif_get_format(struct vpfe_isif_device *isif, struct v4l2_subdev_pad_config *cfg,
-		  unsigned int pad, enum v4l2_subdev_format_whence which)
+__isif_get_format(struct vpfe_isif_device *isif,
+		  struct v4l2_subdev_pad_config *cfg, unsigned int pad,
+		  enum v4l2_subdev_format_whence which)
 {
 	if (which == V4L2_SUBDEV_FORMAT_TRY) {
 		struct v4l2_subdev_format fmt;

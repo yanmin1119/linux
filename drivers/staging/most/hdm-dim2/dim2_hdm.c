@@ -736,7 +736,7 @@ static int dim2_probe(struct platform_device *pdev)
 	int ret, i;
 	struct kobject *kobj;
 
-	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
 
@@ -747,47 +747,31 @@ static int dim2_probe(struct platform_device *pdev)
 	test_dev = dev;
 #else
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!res) {
-		pr_err("no memory region defined\n");
-		ret = -ENOENT;
-		goto err_free_dev;
-	}
-
-	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
-		pr_err("failed to request mem region\n");
-		ret = -EBUSY;
-		goto err_free_dev;
-	}
-
-	dev->io_base = ioremap(res->start, resource_size(res));
-	if (!dev->io_base) {
-		pr_err("failed to ioremap\n");
-		ret = -ENOMEM;
-		goto err_release_mem;
-	}
+	dev->io_base = devm_ioremap_resource(&pdev->dev, res);
+	if (IS_ERR(dev->io_base))
+		return PTR_ERR(dev->io_base);
 
 	ret = platform_get_irq(pdev, 0);
 	if (ret < 0) {
-		pr_err("failed to get irq\n");
-		goto err_unmap_io;
+		dev_err(&pdev->dev, "failed to get irq\n");
+		return -ENODEV;
 	}
 	dev->irq_ahb0 = ret;
 
-	ret = request_irq(dev->irq_ahb0, dim2_ahb_isr, 0, "mlb_ahb0", dev);
+	ret = devm_request_irq(&pdev->dev, dev->irq_ahb0, dim2_ahb_isr, 0,
+			       "mlb_ahb0", dev);
 	if (ret) {
-		pr_err("failed to request IRQ: %d, err: %d\n",
-		       dev->irq_ahb0, ret);
-		goto err_unmap_io;
+		dev_err(&pdev->dev, "failed to request IRQ: %d, err: %d\n",
+			dev->irq_ahb0, ret);
+		return ret;
 	}
 #endif
 	init_waitqueue_head(&dev->netinfo_waitq);
 	dev->deliver_netinfo = 0;
 	dev->netinfo_task = kthread_run(&deliver_netinfo_thread, (void *)dev,
 					"dim2_netinfo");
-	if (IS_ERR(dev->netinfo_task)) {
+	if (IS_ERR(dev->netinfo_task))
 		ret = PTR_ERR(dev->netinfo_task);
-		goto err_free_irq;
-	}
 
 	for (i = 0; i < DMA_CHANNELS; i++) {
 		struct most_channel_capability *cap = dev->capabilities + i;
@@ -855,16 +839,6 @@ err_unreg_iface:
 	most_deregister_interface(&dev->most_iface);
 err_stop_thread:
 	kthread_stop(dev->netinfo_task);
-err_free_irq:
-#if !defined(ENABLE_HDM_TEST)
-	free_irq(dev->irq_ahb0, dev);
-err_unmap_io:
-	iounmap(dev->io_base);
-err_release_mem:
-	release_mem_region(res->start, resource_size(res));
-err_free_dev:
-#endif
-	kfree(dev);
 
 	return ret;
 }
@@ -878,7 +852,6 @@ err_free_dev:
 static int dim2_remove(struct platform_device *pdev)
 {
 	struct dim2_hdm *dev = platform_get_drvdata(pdev);
-	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	struct dim2_platform_data *pdata = pdev->dev.platform_data;
 	unsigned long flags;
 
@@ -892,13 +865,6 @@ static int dim2_remove(struct platform_device *pdev)
 	dim2_sysfs_destroy(&dev->bus);
 	most_deregister_interface(&dev->most_iface);
 	kthread_stop(dev->netinfo_task);
-#if !defined(ENABLE_HDM_TEST)
-	free_irq(dev->irq_ahb0, dev);
-	iounmap(dev->io_base);
-	release_mem_region(res->start, resource_size(res));
-#endif
-	kfree(dev);
-	platform_set_drvdata(pdev, NULL);
 
 	/*
 	 * break link to local platform_device_id struct

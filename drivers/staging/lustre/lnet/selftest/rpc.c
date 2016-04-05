@@ -1097,10 +1097,10 @@ srpc_client_rpc_expired(void *data)
 	spin_unlock(&srpc_data.rpc_glock);
 }
 
-inline void
+static void
 srpc_add_client_rpc_timer(srpc_client_rpc_t *rpc)
 {
-	stt_timer_t *timer = &rpc->crpc_timer;
+	struct stt_timer *timer = &rpc->crpc_timer;
 
 	if (!rpc->crpc_timeout)
 		return;
@@ -1612,7 +1612,7 @@ srpc_startup(void)
 
 	srpc_data.rpc_state = SRPC_STATE_NONE;
 
-	rc = LNetNIInit(LUSTRE_SRV_LNET_PID);
+	rc = LNetNIInit(LNET_PID_LUSTRE);
 	if (rc < 0) {
 		CERROR("LNetNIInit() has failed: %d\n", rc);
 		return rc;

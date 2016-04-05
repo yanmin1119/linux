@@ -1,5 +1,4 @@
 #include "wilc_wfi_cfgoperations.h"
-#include "linux_wlan_common.h"
 #include "wilc_wlan_if.h"
 #include "wilc_wlan.h"
 
@@ -13,7 +12,6 @@
 
 #include <linux/kthread.h>
 #include <linux/firmware.h>
-#include <linux/delay.h>
 
 #include <linux/init.h>
 #include <linux/netdevice.h>
@@ -222,11 +220,6 @@ static void deinit_irq(struct net_device *dev)
 		free_irq(wilc->dev_irq_num, wilc);
 		gpio_free(wilc->gpio);
 	}
-}
-
-void wilc_dbg(u8 *buff)
-{
-	PRINT_D(INIT_DBG, "%d\n", *buff);
 }
 
 int wilc_lock_timeout(struct wilc *nic, void *vp, u32 timeout)
@@ -1312,7 +1305,7 @@ EXPORT_SYMBOL_GPL(wilc_netdev_cleanup);
 int wilc_netdev_init(struct wilc **wilc, struct device *dev, int io_type,
 		     int gpio, const struct wilc_hif_func *ops)
 {
-	int i;
+	int i, ret;
 	struct wilc_vif *vif;
 	struct net_device *ndev;
 	struct wilc *wl;
@@ -1333,7 +1326,7 @@ int wilc_netdev_init(struct wilc **wilc, struct device *dev, int io_type,
 	for (i = 0; i < NUM_CONCURRENT_IFC; i++) {
 		ndev = alloc_etherdev(sizeof(struct wilc_vif));
 		if (!ndev)
-			return -1;
+			return -ENOMEM;
 
 		vif = netdev_priv(ndev);
 		memset(vif, 0, sizeof(struct wilc_vif));
@@ -1372,8 +1365,9 @@ int wilc_netdev_init(struct wilc **wilc, struct device *dev, int io_type,
 			vif->netstats.tx_bytes = 0;
 		}
 
-		if (register_netdev(ndev))
-			return -1;
+		ret = register_netdev(ndev);
+		if (ret)
+			return ret;
 
 		vif->iftype = STATION_MODE;
 		vif->mac_opened = 0;

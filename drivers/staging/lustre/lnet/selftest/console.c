@@ -58,7 +58,7 @@ do {							\
 	(p)->nle_nnode++;				\
 } while (0)
 
-lstcon_session_t console_session;
+struct lstcon_session console_session;
 
 static void
 lstcon_node_get(lstcon_node_t *nd)
@@ -206,8 +206,14 @@ lstcon_group_alloc(char *name, lstcon_group_t **grpp)
 		return -ENOMEM;
 
 	grp->grp_ref = 1;
-	if (name)
-		strcpy(grp->grp_name, name);
+	if (name) {
+		if (strlen(name) > sizeof(grp->grp_name)-1) {
+			LIBCFS_FREE(grp, offsetof(lstcon_group_t,
+				    grp_ndl_hash[LST_NODE_HASHSIZE]));
+			return -E2BIG;
+		}
+		strncpy(grp->grp_name, name, sizeof(grp->grp_name));
+	}
 
 	INIT_LIST_HEAD(&grp->grp_link);
 	INIT_LIST_HEAD(&grp->grp_ndl_list);
@@ -873,7 +879,13 @@ lstcon_batch_add(char *name)
 		return -ENOMEM;
 	}
 
-	strcpy(bat->bat_name, name);
+	if (strlen(name) > sizeof(bat->bat_name) - 1) {
+		LIBCFS_FREE(bat->bat_srv_hash, LST_NODE_HASHSIZE);
+		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
+		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+		return -E2BIG;
+	}
+	strncpy(bat->bat_name, name, sizeof(bat->bat_name));
 	bat->bat_hdr.tsb_index = 0;
 	bat->bat_hdr.tsb_id.bat_id = ++console_session.ses_id_cookie;
 
@@ -1693,8 +1705,6 @@ lstcon_new_session_id(lst_sid_t *sid)
 	sid->ses_stamp = cfs_time_current();
 }
 
-extern srpc_service_t lstcon_acceptor_service;
-
 int
 lstcon_session_new(char *name, int key, unsigned feats,
 		   int timeout, int force, lst_sid_t __user *sid_up)
@@ -1735,7 +1745,10 @@ lstcon_session_new(char *name, int key, unsigned feats,
 	console_session.ses_feats_updated = 0;
 	console_session.ses_timeout = (timeout <= 0) ?
 				      LST_CONSOLE_TIMEOUT : timeout;
-	strlcpy(console_session.ses_name, name,
+
+	if (strlen(name) > sizeof(console_session.ses_name)-1)
+		return -E2BIG;
+	strncpy(console_session.ses_name, name,
 		sizeof(console_session.ses_name));
 
 	rc = lstcon_batch_add(LST_DEFAULT_BATCH);
@@ -1973,7 +1986,7 @@ out:
 	return rc;
 }
 
-srpc_service_t lstcon_acceptor_service;
+static srpc_service_t lstcon_acceptor_service;
 static void lstcon_init_acceptor_service(void)
 {
 	/* initialize selftest console acceptor service table */
@@ -1983,7 +1996,7 @@ static void lstcon_init_acceptor_service(void)
 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
 }
 
-extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
+extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
 
 static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
 
@@ -1994,7 +2007,7 @@ lstcon_console_init(void)
 	int i;
 	int rc;
 
-	memset(&console_session, 0, sizeof(lstcon_session_t));
+	memset(&console_session, 0, sizeof(struct lstcon_session));
 
 	console_session.ses_id		  = LST_INVALID_SID;
 	console_session.ses_state	  = LST_SESSION_NONE;

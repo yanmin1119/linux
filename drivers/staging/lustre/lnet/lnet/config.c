@@ -77,7 +77,7 @@ lnet_issep(char c)
 	}
 }
 
-static int
+int
 lnet_net_unique(__u32 net, struct list_head *nilist)
 {
 	struct list_head *tmp;
@@ -96,6 +96,8 @@ lnet_net_unique(__u32 net, struct list_head *nilist)
 void
 lnet_ni_free(struct lnet_ni *ni)
 {
+	int i;
+
 	if (ni->ni_refs)
 		cfs_percpt_free(ni->ni_refs);
 
@@ -105,10 +107,14 @@ lnet_ni_free(struct lnet_ni *ni)
 	if (ni->ni_cpts)
 		cfs_expr_list_values_free(ni->ni_cpts, ni->ni_ncpts);
 
+	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++) {
+		LIBCFS_FREE(ni->ni_interfaces[i],
+			    strlen(ni->ni_interfaces[i]) + 1);
+	}
 	LIBCFS_FREE(ni, sizeof(*ni));
 }
 
-static lnet_ni_t *
+lnet_ni_t *
 lnet_ni_alloc(__u32 net, struct cfs_expr_list *el, struct list_head *nilist)
 {
 	struct lnet_tx_queue *tq;
@@ -178,13 +184,19 @@ int
 lnet_parse_networks(struct list_head *nilist, char *networks)
 {
 	struct cfs_expr_list *el = NULL;
-	int tokensize = strlen(networks) + 1;
+	int tokensize;
 	char *tokens;
 	char *str;
 	char *tmp;
 	struct lnet_ni *ni;
 	__u32 net;
 	int nnets = 0;
+	struct list_head *temp_node;
+
+	if (!networks) {
+		CERROR("networks string is undefined\n");
+		return -EINVAL;
+	}
 
 	if (strlen(networks) > LNET_SINGLE_TEXTBUF_NOB) {
 		/* _WAY_ conservative */
@@ -193,22 +205,17 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 		return -EINVAL;
 	}
 
+	tokensize = strlen(networks) + 1;
+
 	LIBCFS_ALLOC(tokens, tokensize);
 	if (!tokens) {
 		CERROR("Can't allocate net tokens\n");
 		return -ENOMEM;
 	}
 
-	the_lnet.ln_network_tokens = tokens;
-	the_lnet.ln_network_tokens_nob = tokensize;
 	memcpy(tokens, networks, tokensize);
 	tmp = tokens;
 	str = tokens;
-
-	/* Add in the loopback network */
-	ni = lnet_ni_alloc(LNET_MKNET(LOLND, 0), NULL, nilist);
-	if (!ni)
-		goto failed;
 
 	while (str && *str) {
 		char *comma = strchr(str, ',');
@@ -283,7 +290,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 			goto failed_syntax;
 		}
 
-		nnets++;
 		ni = lnet_ni_alloc(net, el, nilist);
 		if (!ni)
 			goto failed;
@@ -321,7 +327,23 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 				goto failed;
 			}
 
-			ni->ni_interfaces[niface++] = iface;
+			/*
+			 * Allocate a separate piece of memory and copy
+			 * into it the string, so we don't have
+			 * a depencency on the tokens string.  This way we
+			 * can free the tokens at the end of the function.
+			 * The newly allocated ni_interfaces[] can be
+			 * freed when freeing the NI
+			 */
+			LIBCFS_ALLOC(ni->ni_interfaces[niface],
+				     strlen(iface) + 1);
+			if (!ni->ni_interfaces[niface]) {
+				CERROR("Can't allocate net interface name\n");
+				goto failed;
+			}
+			strncpy(ni->ni_interfaces[niface], iface,
+				strlen(iface));
+			niface++;
 			iface = comma;
 		} while (iface);
 
@@ -345,8 +367,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 		}
 	}
 
-	LASSERT(!list_empty(nilist));
-	return 0;
+	list_for_each(temp_node, nilist)
+		nnets++;
+
+	LIBCFS_FREE(tokens, tokensize);
+	return nnets;
 
  failed_syntax:
 	lnet_syntax("networks", networks, (int)(tmp - tokens), strlen(tmp));
@@ -362,7 +387,6 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 		cfs_expr_list_free(el);
 
 	LIBCFS_FREE(tokens, tokensize);
-	the_lnet.ln_network_tokens = NULL;
 
 	return -EINVAL;
 }
@@ -443,7 +467,7 @@ lnet_str2tbs_sep(struct list_head *tbs, char *str)
 			ltb = lnet_new_text_buf(nob);
 			if (!ltb) {
 				lnet_free_text_bufs(&pending);
-				return -1;
+				return -ENOMEM;
 			}
 
 			for (i = 0; i < nob; i++)
@@ -574,7 +598,7 @@ lnet_str2tbs_expand(struct list_head *tbs, char *str)
 
  failed:
 	lnet_free_text_bufs(&pending);
-	return -1;
+	return -EINVAL;
 }
 
 static int
@@ -610,7 +634,7 @@ lnet_parse_priority(char *str, unsigned int *priority, char **token)
 		 * priority as the token to report in the error message.
 		 */
 		*token += sep - str + 1;
-		return -1;
+		return -EINVAL;
 	}
 
 	CDEBUG(D_NET, "gateway %s, priority %d, nob %d\n", str, *priority, nob);
@@ -640,7 +664,7 @@ lnet_parse_route(char *str, int *im_a_router)
 	char *token = str;
 	int ntokens = 0;
 	int myrc = -1;
-	unsigned int hops;
+	__u32 hops;
 	int got_hops = 0;
 	unsigned int priority = 0;
 
@@ -723,8 +747,12 @@ lnet_parse_route(char *str, int *im_a_router)
 		}
 	}
 
+	/**
+	 * if there are no hops set then we want to flag this value as
+	 * unset since hops is an optional parameter
+	 */
 	if (!got_hops)
-		hops = 1;
+		hops = LNET_UNDEFINED_HOPS;
 
 	LASSERT(!list_empty(&nets));
 	LASSERT(!list_empty(&gateways));
@@ -745,7 +773,7 @@ lnet_parse_route(char *str, int *im_a_router)
 			}
 
 			rc = lnet_add_route(net, hops, nid, priority);
-			if (rc) {
+			if (rc && rc != -EEXIST && rc != -EHOSTUNREACH) {
 				CERROR("Can't create route to %s via %s\n",
 				       libcfs_net2str(net),
 				       libcfs_nid2str(nid));

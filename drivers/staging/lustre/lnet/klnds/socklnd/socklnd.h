@@ -19,10 +19,6 @@
  *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *   GNU General Public License for more details.
  *
- *   You should have received a copy of the GNU General Public License
- *   along with Portals; if not, write to the Free Software
- *   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
  */
 
 #ifndef _SOCKLND_SOCKLND_H_
@@ -287,7 +283,7 @@ typedef struct                             /* transmit packet */
 	} tx_frags;
 } ksock_tx_t;
 
-#define KSOCK_NOOP_TX_SIZE ((int)offsetof(ksock_tx_t, tx_frags.paged.kiov[0]))
+#define KSOCK_NOOP_TX_SIZE (offsetof(ksock_tx_t, tx_frags.paged.kiov[0]))
 
 /* network zero copy callback descriptor embedded in ksock_tx_t */
 

@@ -11,7 +11,6 @@
 #define WILC_WLAN_IF_H
 
 #include <linux/semaphore.h>
-#include "linux_wlan_common.h"
 #include <linux/netdevice.h>
 
 /********************************************
@@ -51,26 +50,24 @@
  *
  ********************************************/
 
-typedef struct {
+struct sdio_cmd52 {
 	u32 read_write:		1;
 	u32 function:		3;
 	u32 raw:		1;
 	u32 address:		17;
 	u32 data:		8;
-} sdio_cmd52_t;
+};
 
-typedef struct {
-	/* struct { */
+struct sdio_cmd53 {
 	u32 read_write:		1;
 	u32 function:		3;
 	u32 block_mode:		1;
 	u32 increment:		1;
 	u32 address:		17;
 	u32 count:		9;
-	/* } bit; */
 	u8 *buffer;
 	u32 block_size;
-} sdio_cmd53_t;
+};
 
 #define WILC_MAC_INDICATE_STATUS	0x1
 #define WILC_MAC_STATUS_INIT		-1
@@ -95,11 +92,9 @@ typedef void (*wilc_tx_complete_func_t)(void *, int);
  *      Wlan Configuration ID
  *
  ********************************************/
-
+#define WILC_MULTICAST_TABLE_SIZE	8
 #define MAX_SSID_LEN            33
 #define MAX_RATES_SUPPORTED     12
-
-#define INFINITE_SLEEP_TIME	((u32)0xFFFFFFFF)
 
 typedef enum {
 	SUPP_RATES_IE		= 1,
@@ -919,8 +914,6 @@ typedef enum {
 
 struct wilc;
 int wilc_wlan_init(struct net_device *dev);
-void wilc_bus_set_max_speed(void);
-void wilc_bus_set_default_speed(void);
 u32 wilc_get_chipid(struct wilc *wilc, bool update);
 
 #endif

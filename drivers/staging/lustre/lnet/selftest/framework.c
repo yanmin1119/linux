@@ -160,7 +160,7 @@ static void
 sfw_add_session_timer(void)
 {
 	sfw_session_t *sn = sfw_data.fw_session;
-	stt_timer_t *timer = &sn->sn_timer;
+	struct stt_timer *timer = &sn->sn_timer;
 
 	LASSERT(!sfw_data.fw_shuttingdown);
 
@@ -261,7 +261,7 @@ static inline void
 sfw_init_session(sfw_session_t *sn, lst_sid_t sid,
 		 unsigned features, const char *name)
 {
-	stt_timer_t *timer = &sn->sn_timer;
+	struct stt_timer *timer = &sn->sn_timer;
 
 	memset(sn, 0, sizeof(sfw_session_t));
 	INIT_LIST_HEAD(&sn->sn_list);
@@ -541,9 +541,15 @@ sfw_test_rpc_fini(srpc_client_rpc_t *rpc)
 static inline int
 sfw_test_buffers(sfw_test_instance_t *tsi)
 {
-	struct sfw_test_case *tsc = sfw_find_test_case(tsi->tsi_service);
-	struct srpc_service *svc = tsc->tsc_srv_service;
+	struct sfw_test_case *tsc;
+	struct srpc_service *svc;
 	int nbuf;
+
+	LASSERT(tsi);
+	tsc = sfw_find_test_case(tsi->tsi_service);
+	LASSERT(tsc);
+	svc = tsc->tsc_srv_service;
+	LASSERT(svc);
 
 	nbuf = min(svc->sv_wi_total, tsi->tsi_loop) / svc->sv_ncpts;
 	return max(SFW_TEST_WI_MIN, nbuf + SFW_TEST_WI_EXTRA);
@@ -591,8 +597,10 @@ sfw_load_test(struct sfw_test_instance *tsi)
 static void
 sfw_unload_test(struct sfw_test_instance *tsi)
 {
-	struct sfw_test_case *tsc = sfw_find_test_case(tsi->tsi_service);
+	struct sfw_test_case *tsc;
 
+	LASSERT(tsi);
+	tsc = sfw_find_test_case(tsi->tsi_service);
 	LASSERT(tsc);
 
 	if (tsi->tsi_is_client)
@@ -1628,16 +1636,6 @@ static srpc_service_t sfw_services[] = {
 		0
 	}
 };
-
-extern sfw_test_client_ops_t ping_test_client;
-extern srpc_service_t	ping_test_service;
-extern void ping_init_test_client(void);
-extern void ping_init_test_service(void);
-
-extern sfw_test_client_ops_t brw_test_client;
-extern srpc_service_t	brw_test_service;
-extern void brw_init_test_client(void);
-extern void brw_init_test_service(void);
 
 int
 sfw_startup(void)

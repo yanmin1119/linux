@@ -387,7 +387,8 @@ static inline void obd_ioctl_freedata(char *buf, int len)
  */
 
 /* Until such time as we get_info the per-stripe maximum from the OST,
- * we define this to be 2T - 4k, which is the ext3 maxbytes. */
+ * we define this to be 2T - 4k, which is the ext3 maxbytes.
+ */
 #define LUSTRE_STRIPE_MAXBYTES 0x1fffffff000ULL
 
 /* Special values for remove LOV EA from disk */
@@ -540,7 +541,7 @@ do {									   \
 	l_add_wait(&wq, &__wait);					      \
 									       \
 	/* Block all signals (just the non-fatal ones if no timeout). */       \
-	if (info->lwi_on_signal != NULL && (__timeout == 0 || __allow_intr))   \
+	if (info->lwi_on_signal && (__timeout == 0 || __allow_intr))   \
 		__blocked = cfs_block_sigsinv(LUSTRE_FATAL_SIGS);	      \
 	else								   \
 		__blocked = cfs_block_sigsinv(0);			      \
@@ -562,13 +563,13 @@ do {									   \
 			__timeout = cfs_time_sub(__timeout,		    \
 					    cfs_time_sub(interval, remaining));\
 			if (__timeout == 0) {				  \
-				if (info->lwi_on_timeout == NULL ||	    \
+				if (!info->lwi_on_timeout ||		      \
 				    info->lwi_on_timeout(info->lwi_cb_data)) { \
 					ret = -ETIMEDOUT;		      \
 					break;				 \
 				}					      \
 				/* Take signals after the timeout expires. */  \
-				if (info->lwi_on_signal != NULL)	       \
+				if (info->lwi_on_signal)		       \
 				    (void)cfs_block_sigsinv(LUSTRE_FATAL_SIGS);\
 			}						      \
 		}							      \
@@ -578,7 +579,7 @@ do {									   \
 		if (condition)						 \
 			break;						 \
 		if (cfs_signal_pending()) {				    \
-			if (info->lwi_on_signal != NULL &&		     \
+			if (info->lwi_on_signal &&		     \
 			    (__timeout == 0 || __allow_intr)) {		\
 				if (info->lwi_on_signal != LWI_ON_SIGNAL_NOOP) \
 					info->lwi_on_signal(info->lwi_cb_data);\

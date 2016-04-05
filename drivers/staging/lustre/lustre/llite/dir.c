@@ -190,8 +190,6 @@ static int ll_dir_filler(void *_hash, struct page *page0)
 	} else if (rc == 0) {
 		body = req_capsule_server_get(&request->rq_pill, &RMF_MDT_BODY);
 		/* Checked by mdc_readpage() */
-		LASSERT(body != NULL);
-
 		if (body->valid & OBD_MD_FLSIZE)
 			cl_isize_write(inode, body->size);
 
@@ -245,7 +243,7 @@ void ll_release_page(struct page *page, int remove)
 	kunmap(page);
 	if (remove) {
 		lock_page(page);
-		if (likely(page->mapping != NULL))
+		if (likely(page->mapping))
 			truncate_complete_page(page->mapping, page);
 		unlock_page(page);
 	}
@@ -334,7 +332,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 	struct lustre_handle lockh;
 	struct lu_dirpage *dp;
 	struct page *page;
-	ldlm_mode_t mode;
+	enum ldlm_mode mode;
 	int rc;
 	__u64 start = 0;
 	__u64 end = 0;
@@ -357,7 +355,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 		struct md_op_data *op_data;
 
 		op_data = ll_prep_md_op_data(NULL, dir, dir, NULL, 0, 0,
-		LUSTRE_OPC_ANY, NULL);
+					     LUSTRE_OPC_ANY, NULL);
 		if (IS_ERR(op_data))
 			return (void *)op_data;
 
@@ -370,8 +368,8 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 		if (request)
 			ptlrpc_req_finished(request);
 		if (rc < 0) {
-			CERROR("lock enqueue: "DFID" at %llu: rc %d\n",
-				PFID(ll_inode2fid(dir)), hash, rc);
+			CERROR("lock enqueue: " DFID " at %llu: rc %d\n",
+			       PFID(ll_inode2fid(dir)), hash, rc);
 			return ERR_PTR(rc);
 		}
 
@@ -381,7 +379,8 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 				 &it.d.lustre.it_lock_handle, dir, NULL);
 	} else {
 		/* for cross-ref object, l_ast_data of the lock may not be set,
-		 * we reset it here */
+		 * we reset it here
+		 */
 		md_set_lock_data(ll_i2sbi(dir)->ll_md_exp, &lockh.cookie,
 				 dir, NULL);
 	}
@@ -393,7 +392,7 @@ struct page *ll_get_dir_page(struct inode *dir, __u64 hash,
 		CERROR("dir page locate: "DFID" at %llu: rc %ld\n",
 		       PFID(ll_inode2fid(dir)), lhash, PTR_ERR(page));
 		goto out_unlock;
-	} else if (page != NULL) {
+	} else if (page) {
 		/*
 		 * XXX nikita: not entirely correct handling of a corner case:
 		 * suppose hash chain of entries with hash value HASH crosses
@@ -499,7 +498,7 @@ int ll_dir_read(struct inode *inode, struct dir_context *ctx)
 			__u64 next;
 
 			dp = page_address(page);
-			for (ent = lu_dirent_start(dp); ent != NULL && !done;
+			for (ent = lu_dirent_start(dp); ent && !done;
 			     ent = lu_dirent_next(ent)) {
 				__u16	  type;
 				int	    namelen;
@@ -689,7 +688,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
 	struct obd_device *mgc = lsi->lsi_mgc;
 	int lum_size;
 
-	if (lump != NULL) {
+	if (lump) {
 		/*
 		 * This is coming from userspace, so should be in
 		 * local endian.  But the MDS would like it in little
@@ -725,7 +724,7 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
 	if (IS_ERR(op_data))
 		return PTR_ERR(op_data);
 
-	if (lump != NULL && lump->lmm_magic == cpu_to_le32(LMV_USER_MAGIC))
+	if (lump && lump->lmm_magic == cpu_to_le32(LMV_USER_MAGIC))
 		op_data->op_cli_flags |= CLI_SET_MEA;
 
 	/* swabbing is done in lov_setstripe() on server side */
@@ -739,8 +738,9 @@ int ll_dir_setstripe(struct inode *inode, struct lov_user_md *lump,
 	}
 
 	/* In the following we use the fact that LOV_USER_MAGIC_V1 and
-	 LOV_USER_MAGIC_V3 have the same initial fields so we do not
-	 need to make the distinction between the 2 versions */
+	 * LOV_USER_MAGIC_V3 have the same initial fields so we do not
+	 * need to make the distinction between the 2 versions
+	 */
 	if (set_default && mgc->u.cli.cl_mgc_mgsexp) {
 		char *param = NULL;
 		char *buf;
@@ -812,7 +812,6 @@ int ll_dir_getstripe(struct inode *inode, struct lov_mds_md **lmmp,
 	}
 
 	body = req_capsule_server_get(&req->rq_pill, &RMF_MDT_BODY);
-	LASSERT(body != NULL);
 
 	lmmsize = body->eadatasize;
 
@@ -824,7 +823,6 @@ int ll_dir_getstripe(struct inode *inode, struct lov_mds_md **lmmp,
 
 	lmm = req_capsule_server_sized_get(&req->rq_pill,
 					   &RMF_MDT_MD, lmmsize);
-	LASSERT(lmm != NULL);
 
 	/*
 	 * This is coming from the MDS, so is probably in
@@ -880,7 +878,7 @@ int ll_get_mdt_idx(struct inode *inode)
 /**
  * Generic handler to do any pre-copy work.
  *
- * It send a first hsm_progress (with extent length == 0) to coordinator as a
+ * It sends a first hsm_progress (with extent length == 0) to coordinator as a
  * first information for it that real work has started.
  *
  * Moreover, for a ARCHIVE request, it will sample the file data version and
@@ -932,8 +930,9 @@ static int ll_ioc_copy_start(struct super_block *sb, struct hsm_copy *copy)
 			goto progress;
 		}
 
-		/* Store it the hsm_copy for later copytool use.
-		 * Always modified even if no lsm. */
+		/* Store in the hsm_copy for later copytool use.
+		 * Always modified even if no lsm.
+		 */
 		copy->hc_data_version = data_version;
 	}
 
@@ -1009,12 +1008,14 @@ static int ll_ioc_copy_end(struct super_block *sb, struct hsm_copy *copy)
 			goto progress;
 		}
 
-		/* Store it the hsm_copy for later copytool use.
-		 * Always modified even if no lsm. */
+		/* Store in the hsm_copy for later copytool use.
+		 * Always modified even if no lsm.
+		 */
 		hpk.hpk_data_version = data_version;
 
 		/* File could have been stripped during archiving, so we need
-		 * to check anyway. */
+		 * to check anyway.
+		 */
 		if ((copy->hc_hai.hai_action == HSMA_ARCHIVE) &&
 		    (copy->hc_data_version != data_version)) {
 			CDEBUG(D_HSM, "File data version mismatched. File content was changed during archiving. "
@@ -1026,7 +1027,8 @@ static int ll_ioc_copy_end(struct super_block *sb, struct hsm_copy *copy)
 			 * the cdt will loop on retried archive requests.
 			 * The policy engine will ask for a new archive later
 			 * when the file will not be modified for some tunable
-			 * time */
+			 * time
+			 */
 			/* we do not notify caller */
 			hpk.hpk_flags &= ~HP_FLAG_RETRY;
 			/* hpk_errval must be >= 0 */
@@ -1154,7 +1156,8 @@ static int quotactl_ioctl(struct ll_sb_info *sbi, struct if_quotactl *qctl)
 			return rc;
 		}
 		/* If QIF_SPACE is not set, client should collect the
-		 * space usage from OSSs by itself */
+		 * space usage from OSSs by itself
+		 */
 		if (cmd == Q_GETQUOTA &&
 		    !(oqctl->qc_dqblk.dqb_valid & QIF_SPACE) &&
 		    !oqctl->qc_dqblk.dqb_curspace) {
@@ -1205,7 +1208,8 @@ out:
 
 /* This function tries to get a single name component,
  * to send to the server. No actual path traversal involved,
- * so we limit to NAME_MAX */
+ * so we limit to NAME_MAX
+ */
 static char *ll_getname(const char __user *filename)
 {
 	int ret = 0, len;
@@ -1326,7 +1330,7 @@ out_free:
 			return rc;
 
 		data = (void *)buf;
-		if (data->ioc_inlbuf1 == NULL || data->ioc_inlbuf2 == NULL ||
+		if (!data->ioc_inlbuf1 || !data->ioc_inlbuf2 ||
 		    data->ioc_inllen1 == 0 || data->ioc_inllen2 == 0) {
 			rc = -EINVAL;
 			goto lmv_out_free;
@@ -1461,7 +1465,7 @@ free_lmv:
 		if (request) {
 			body = req_capsule_server_get(&request->rq_pill,
 						      &RMF_MDT_BODY);
-			LASSERT(body != NULL);
+			LASSERT(body);
 		} else {
 			goto out_req;
 		}
@@ -1539,7 +1543,7 @@ out_req:
 			return rc;
 
 		lmm = libcfs_kvzalloc(lmmsize, GFP_NOFS);
-		if (lmm == NULL)
+		if (!lmm)
 			return -ENOMEM;
 		if (copy_from_user(lmm, lum, lmmsize)) {
 			rc = -EFAULT;
@@ -1688,7 +1692,6 @@ out_quotactl:
 	    if (sbi->ll_flags & LL_SBI_RMT_CLIENT && is_root_inode(inode)) {
 		struct ll_file_data *fd = LUSTRE_FPRIVATE(file);
 
-		LASSERT(fd != NULL);
 		rc = rct_add(&sbi->ll_rct, current_pid(), arg);
 		if (!rc)
 			fd->fd_flags |= LL_FILE_RMTACL;
@@ -1757,7 +1760,7 @@ out_quotactl:
 			return -E2BIG;
 
 		hur = libcfs_kvzalloc(totalsize, GFP_NOFS);
-		if (hur == NULL)
+		if (!hur)
 			return -ENOMEM;
 
 		/* Copy the whole struct */
@@ -1808,7 +1811,8 @@ out_quotactl:
 		hpk.hpk_data_version = 0;
 
 		/* File may not exist in Lustre; all progress
-		 * reported to Lustre root */
+		 * reported to Lustre root
+		 */
 		rc = obd_iocontrol(cmd, sbi->ll_md_exp, sizeof(hpk), &hpk,
 				   NULL);
 		return rc;

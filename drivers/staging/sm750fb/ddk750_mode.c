@@ -25,13 +25,12 @@ static unsigned long displayControlAdjust_SM750LE(mode_parameter_t *pModeParam, 
 	   Note that normal SM750/SM718 only use those two register for
 	   auto-centering mode.
 	 */
-	POKE32(CRT_AUTO_CENTERING_TL,
-	FIELD_VALUE(0, CRT_AUTO_CENTERING_TL, TOP, 0)
-	| FIELD_VALUE(0, CRT_AUTO_CENTERING_TL, LEFT, 0));
+	POKE32(CRT_AUTO_CENTERING_TL, 0);
 
 	POKE32(CRT_AUTO_CENTERING_BR,
-	FIELD_VALUE(0, CRT_AUTO_CENTERING_BR, BOTTOM, y - 1)
-	| FIELD_VALUE(0, CRT_AUTO_CENTERING_BR, RIGHT, x - 1));
+		(((y - 1) << CRT_AUTO_CENTERING_BR_BOTTOM_SHIFT) &
+			CRT_AUTO_CENTERING_BR_BOTTOM_MASK) |
+		((x - 1) & CRT_AUTO_CENTERING_BR_RIGHT_MASK));
 
 	/* Assume common fields in dispControl have been properly set before
 	   calling this function.
@@ -84,20 +83,32 @@ static int programModeRegisters(mode_parameter_t *pModeParam, pll_value_t *pll)
 		/* programe secondary pixel clock */
 		POKE32(CRT_PLL_CTRL, formatPllReg(pll));
 		POKE32(CRT_HORIZONTAL_TOTAL,
-		FIELD_VALUE(0, CRT_HORIZONTAL_TOTAL, TOTAL, pModeParam->horizontal_total - 1)
-		| FIELD_VALUE(0, CRT_HORIZONTAL_TOTAL, DISPLAY_END, pModeParam->horizontal_display_end - 1));
+			(((pModeParam->horizontal_total - 1) <<
+				CRT_HORIZONTAL_TOTAL_TOTAL_SHIFT) &
+				CRT_HORIZONTAL_TOTAL_TOTAL_MASK) |
+			((pModeParam->horizontal_display_end - 1) &
+				CRT_HORIZONTAL_TOTAL_DISPLAY_END_MASK));
 
 		POKE32(CRT_HORIZONTAL_SYNC,
-		FIELD_VALUE(0, CRT_HORIZONTAL_SYNC, WIDTH, pModeParam->horizontal_sync_width)
-		| FIELD_VALUE(0, CRT_HORIZONTAL_SYNC, START, pModeParam->horizontal_sync_start - 1));
+			((pModeParam->horizontal_sync_width <<
+				CRT_HORIZONTAL_SYNC_WIDTH_SHIFT) &
+				CRT_HORIZONTAL_SYNC_WIDTH_MASK) |
+			((pModeParam->horizontal_sync_start - 1) &
+				CRT_HORIZONTAL_SYNC_START_MASK));
 
 		POKE32(CRT_VERTICAL_TOTAL,
-		FIELD_VALUE(0, CRT_VERTICAL_TOTAL, TOTAL, pModeParam->vertical_total - 1)
-		| FIELD_VALUE(0, CRT_VERTICAL_TOTAL, DISPLAY_END, pModeParam->vertical_display_end - 1));
+			(((pModeParam->vertical_total - 1) <<
+				CRT_VERTICAL_TOTAL_TOTAL_SHIFT) &
+				CRT_VERTICAL_TOTAL_TOTAL_MASK) |
+			((pModeParam->vertical_display_end - 1) &
+				CRT_VERTICAL_TOTAL_DISPLAY_END_MASK));
 
 		POKE32(CRT_VERTICAL_SYNC,
-		FIELD_VALUE(0, CRT_VERTICAL_SYNC, HEIGHT, pModeParam->vertical_sync_height)
-		| FIELD_VALUE(0, CRT_VERTICAL_SYNC, START, pModeParam->vertical_sync_start - 1));
+			((pModeParam->vertical_sync_height <<
+				CRT_VERTICAL_SYNC_HEIGHT_SHIFT) &
+				CRT_VERTICAL_SYNC_HEIGHT_MASK) |
+			((pModeParam->vertical_sync_start - 1) &
+				CRT_VERTICAL_SYNC_START_MASK));
 
 
 		tmp = DISPLAY_CTRL_TIMING | DISPLAY_CTRL_PLANE;
@@ -130,16 +141,25 @@ static int programModeRegisters(mode_parameter_t *pModeParam, pll_value_t *pll)
 		POKE32(PANEL_HORIZONTAL_TOTAL, reg);
 
 		POKE32(PANEL_HORIZONTAL_SYNC,
-		FIELD_VALUE(0, PANEL_HORIZONTAL_SYNC, WIDTH, pModeParam->horizontal_sync_width)
-		| FIELD_VALUE(0, PANEL_HORIZONTAL_SYNC, START, pModeParam->horizontal_sync_start - 1));
+			((pModeParam->horizontal_sync_width <<
+				PANEL_HORIZONTAL_SYNC_WIDTH_SHIFT) &
+				PANEL_HORIZONTAL_SYNC_WIDTH_MASK) |
+			((pModeParam->horizontal_sync_start - 1) &
+				PANEL_HORIZONTAL_SYNC_START_MASK));
 
 		POKE32(PANEL_VERTICAL_TOTAL,
-		FIELD_VALUE(0, PANEL_VERTICAL_TOTAL, TOTAL, pModeParam->vertical_total - 1)
-			| FIELD_VALUE(0, PANEL_VERTICAL_TOTAL, DISPLAY_END, pModeParam->vertical_display_end - 1));
+			(((pModeParam->vertical_total - 1) <<
+				PANEL_VERTICAL_TOTAL_TOTAL_SHIFT) &
+				PANEL_VERTICAL_TOTAL_TOTAL_MASK) |
+			((pModeParam->vertical_display_end - 1) &
+				PANEL_VERTICAL_TOTAL_DISPLAY_END_MASK));
 
 		POKE32(PANEL_VERTICAL_SYNC,
-		FIELD_VALUE(0, PANEL_VERTICAL_SYNC, HEIGHT, pModeParam->vertical_sync_height)
-		| FIELD_VALUE(0, PANEL_VERTICAL_SYNC, START, pModeParam->vertical_sync_start - 1));
+			((pModeParam->vertical_sync_height <<
+				PANEL_VERTICAL_SYNC_HEIGHT_SHIFT) &
+				PANEL_VERTICAL_SYNC_HEIGHT_MASK) |
+			((pModeParam->vertical_sync_start - 1) &
+				PANEL_VERTICAL_SYNC_START_MASK));
 
 		tmp = DISPLAY_CTRL_TIMING | DISPLAY_CTRL_PLANE;
 		if (pModeParam->vertical_sync_polarity)

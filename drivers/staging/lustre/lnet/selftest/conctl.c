@@ -761,6 +761,11 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
 		LIBCFS_ALLOC(param, args->lstio_tes_param_len);
 		if (!param)
 			goto out;
+		if (copy_from_user(param, args->lstio_tes_param,
+				   args->lstio_tes_param_len)) {
+			rc = -EFAULT;
+			goto out;
+		}
 	}
 
 	rc = -EFAULT;
@@ -769,9 +774,7 @@ static int lst_test_add_ioctl(lstio_test_args_t *args)
 	    copy_from_user(src_name, args->lstio_tes_sgrp_name,
 			   args->lstio_tes_sgrp_nmlen) ||
 	    copy_from_user(dst_name, args->lstio_tes_dgrp_name,
-			   args->lstio_tes_dgrp_nmlen) ||
-	    copy_from_user(param, args->lstio_tes_param,
-			   args->lstio_tes_param_len))
+			   args->lstio_tes_dgrp_nmlen))
 		goto out;
 
 	rc = lstcon_test_add(batch_name, args->lstio_tes_type,
@@ -801,14 +804,19 @@ out:
 }
 
 int
-lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data)
+lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr)
 {
 	char   *buf;
-	int     opc = data->ioc_u32[0];
+	struct libcfs_ioctl_data *data;
+	int     opc;
 	int     rc;
 
 	if (cmd != IOC_LIBCFS_LNETST)
 		return -EINVAL;
+
+	data = container_of(hdr, struct libcfs_ioctl_data, ioc_hdr);
+
+	opc = data->ioc_u32[0];
 
 	if (data->ioc_plen1 > PAGE_CACHE_SIZE)
 		return -EINVAL;

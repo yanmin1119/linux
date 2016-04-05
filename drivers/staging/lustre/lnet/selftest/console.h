@@ -135,7 +135,7 @@ typedef struct lstcon_test {
 
 #define LST_CONSOLE_TIMEOUT 300	     /* default console timeout */
 
-typedef struct {
+struct lstcon_session {
 	struct mutex        ses_mutex;        /* only 1 thread in session */
 	lst_sid_t           ses_id;           /* global session id */
 	int                 ses_key;          /* local session key */
@@ -153,7 +153,7 @@ typedef struct {
 	__u64               ses_id_cookie;    /* batch id cookie */
 	char                ses_name[LST_NAME_SIZE];/* session name */
 	lstcon_rpc_trans_t  *ses_ping;        /* session pinger */
-	stt_timer_t         ses_ping_timer;   /* timer for pinger */
+	struct stt_timer         ses_ping_timer;   /* timer for pinger */
 	lstcon_trans_stat_t ses_trans_stat;   /* transaction stats */
 
 	struct list_head    ses_trans_list;   /* global list of transaction */
@@ -165,9 +165,9 @@ typedef struct {
 	spinlock_t          ses_rpc_lock;     /* serialize */
 	atomic_t            ses_rpc_counter;  /* # of initialized RPCs */
 	struct list_head    ses_rpc_freelist; /* idle console rpc */
-} lstcon_session_t; /* session descriptor */
+}; /* session descriptor */
 
-extern lstcon_session_t	 console_session;
+extern struct lstcon_session	 console_session;
 
 static inline lstcon_trans_stat_t *
 lstcon_trans_stat(void)
@@ -184,7 +184,6 @@ lstcon_id2hash(lnet_process_id_t id, struct list_head *hash)
 }
 
 int lstcon_console_init(void);
-int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_data *data);
 int lstcon_console_fini(void);
 int lstcon_session_match(lst_sid_t sid);
 int lstcon_session_new(char *name, int key, unsigned version,

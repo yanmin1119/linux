@@ -72,7 +72,6 @@ LNetEQAlloc(unsigned int count, lnet_eq_handler_t callback,
 {
 	lnet_eq_t *eq;
 
-	LASSERT(the_lnet.ln_init);
 	LASSERT(the_lnet.ln_refcount > 0);
 
 	/*
@@ -167,7 +166,6 @@ LNetEQFree(lnet_handle_eq_t eqh)
 	int size = 0;
 	int i;
 
-	LASSERT(the_lnet.ln_init);
 	LASSERT(the_lnet.ln_refcount > 0);
 
 	lnet_res_lock(LNET_LOCK_EX);
@@ -322,7 +320,7 @@ __must_hold(&the_lnet.ln_eq_wait_lock)
 	unsigned long now;
 
 	if (!tms)
-		return -1; /* don't want to wait and no new event */
+		return -ENXIO; /* don't want to wait and no new event */
 
 	init_waitqueue_entry(&wl, current);
 	set_current_state(TASK_INTERRUPTIBLE);
@@ -383,7 +381,6 @@ LNetEQPoll(lnet_handle_eq_t *eventqs, int neq, int timeout_ms,
 	int rc;
 	int i;
 
-	LASSERT(the_lnet.ln_init);
 	LASSERT(the_lnet.ln_refcount > 0);
 
 	if (neq < 1)

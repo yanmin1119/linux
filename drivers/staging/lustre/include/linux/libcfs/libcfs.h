@@ -42,6 +42,8 @@
 
 #include "curproc.h"
 
+#define LIBCFS_VERSION "0.7.0"
+
 #define LOWEST_BIT_SET(x)       ((x) & ~((x) - 1))
 
 /*
@@ -50,8 +52,6 @@
  */
 #define LERRCHKSUM(hexnum) (((hexnum) & 0xf) ^ ((hexnum) >> 4 & 0xf) ^ \
 			   ((hexnum) >> 8 & 0xf))
-
-#define LUSTRE_SRV_LNET_PID      LUSTRE_LNET_PID
 
 #include <linux/list.h>
 

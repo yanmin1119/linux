@@ -1,4 +1,3 @@
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -343,11 +342,10 @@ int hw_sm750_crtc_setMode(struct lynxfb_crtc *crtc,
 		POKE32(CRT_FB_ADDRESS, crtc->oScreen);
 		reg = var->xres * (var->bits_per_pixel >> 3);
 		/* crtc->channel is not equal to par->index on numeric,be aware of that */
-		reg = ALIGN(reg, crtc->line_pad);
-
-		POKE32(CRT_FB_WIDTH,
-			FIELD_VALUE(0, CRT_FB_WIDTH, WIDTH, reg)|
-			FIELD_VALUE(0, CRT_FB_WIDTH, OFFSET, fix->line_length));
+		reg = ALIGN(reg, crtc->line_pad) << CRT_FB_WIDTH_WIDTH_SHIFT;
+		reg &= CRT_FB_WIDTH_WIDTH_MASK;
+		reg |= (fix->line_length & CRT_FB_WIDTH_OFFSET_MASK);
+		POKE32(CRT_FB_WIDTH, reg);
 
 		/* SET PIXEL FORMAT */
 		reg = PEEK32(CRT_DISPLAY_CTRL);
@@ -550,8 +548,8 @@ int hw_sm750_pan_display(struct lynxfb_crtc *crtc,
 		       (total & PANEL_FB_ADDRESS_ADDRESS_MASK));
 	} else {
 		POKE32(CRT_FB_ADDRESS,
-			FIELD_VALUE(PEEK32(CRT_FB_ADDRESS),
-				CRT_FB_ADDRESS, ADDRESS, total));
+		       PEEK32(CRT_FB_ADDRESS) |
+		       (total & CRT_FB_ADDRESS_ADDRESS_MASK));
 	}
 	return 0;
 }
