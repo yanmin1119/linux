@@ -281,6 +281,7 @@ struct axiadc_state {
 	struct completion		dma_complete;
 	struct dma_chan			*rx_chan;
 	struct iio_info			iio_info;
+	struct clk 			*clk;
 	void __iomem			*regs;
 	void				*buf_virt;
 	dma_addr_t			buf_phys;
