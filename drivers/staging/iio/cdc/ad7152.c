@@ -89,6 +89,7 @@ struct ad7152_chip_info {
 	 */
 	u8	filter_rate_setup;
 	u8	setup[2];
+	struct mutex state_lock;	/* protect hardware state */
 };
 
 static inline ssize_t ad7152_start_calib(struct device *dev,
@@ -115,10 +116,10 @@ static inline ssize_t ad7152_start_calib(struct device *dev,
 	else
 		regval |= AD7152_CONF_CH2EN;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&chip->state_lock);
 	ret = i2c_smbus_write_byte_data(chip->client, AD7152_REG_CFG, regval);
 	if (ret < 0) {
-		mutex_unlock(&indio_dev->mlock);
+		mutex_unlock(&chip->state_lock);
 		return ret;
 	}
 
@@ -126,12 +127,12 @@ static inline ssize_t ad7152_start_calib(struct device *dev,
 		mdelay(20);
 		ret = i2c_smbus_read_byte_data(chip->client, AD7152_REG_CFG);
 		if (ret < 0) {
-			mutex_unlock(&indio_dev->mlock);
+			mutex_unlock(&chip->state_lock);
 			return ret;
 		}
 	} while ((ret == regval) && timeout--);
 
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&chip->state_lock);
 	return len;
 }
 
@@ -230,14 +231,14 @@ static int ad7152_write_raw_samp_freq(struct device *dev, int val)
 	if (i >= ARRAY_SIZE(ad7152_filter_rate_table))
 		i = ARRAY_SIZE(ad7152_filter_rate_table) - 1;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&chip->state_lock);
 	ret = i2c_smbus_write_byte_data(chip->client,
 					AD7152_REG_CFG2, AD7152_CFG2_OSR(i));
 	if (ret < 0)
 		return ret;
 
 	chip->filter_rate_setup = i;
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&chip->state_lock);
 
 	return ret;
 }
@@ -250,7 +251,7 @@ static int ad7152_write_raw(struct iio_dev *indio_dev,
 	struct ad7152_chip_info *chip = iio_priv(indio_dev);
 	int ret, i;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&chip->state_lock);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_CALIBSCALE:
@@ -318,7 +319,7 @@ static int ad7152_write_raw(struct iio_dev *indio_dev,
 	}
 
 out:
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&chip->state_lock);
 	return ret;
 }
 
@@ -331,7 +332,7 @@ static int ad7152_read_raw(struct iio_dev *indio_dev,
 	int ret;
 	u8 regval = 0;
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&chip->state_lock);
 
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
@@ -419,7 +420,7 @@ static int ad7152_read_raw(struct iio_dev *indio_dev,
 		ret = -EINVAL;
 	}
 out:
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&chip->state_lock);
 	return ret;
 }
 
@@ -506,6 +507,7 @@ static int ad7152_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, indio_dev);
 
 	chip->client = client;
+	mutex_init(&chip->state_lock);
 
 	/* Establish that the iio_dev is a child of the i2c device */
 	indio_dev->name = id->name;
