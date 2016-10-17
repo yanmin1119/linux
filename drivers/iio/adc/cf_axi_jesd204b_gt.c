@@ -494,6 +494,8 @@ static int jesd204b_gt_status_error(struct device *dev,
 	struct jesd204b_gt_state *st = dev_get_drvdata(dev);
 	unsigned val = jesd204b_gt_read(st, JESD204B_GT_REG_STATUS(lane) + offs);
 
+	return 0;
+
 	if ((val & mask) != mask) {
 		dev_err(dev, "%s Error: %s%s%s\n",
 			offs ? "TX" : "RX",

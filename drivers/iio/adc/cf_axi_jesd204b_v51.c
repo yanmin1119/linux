@@ -55,12 +55,13 @@ struct child_clk {
 static inline void jesd204b_write(struct jesd204b_state *st,
 				  unsigned reg, unsigned val)
 {
-	iowrite32(val, st->regs + reg);
+/*	iowrite32(val, st->regs + reg);*/
 }
 
 static inline unsigned int jesd204b_read(struct jesd204b_state *st,
 					 unsigned reg)
 {
+	return 0;
 	return ioread32(st->regs + reg);
 }
 
@@ -71,7 +72,7 @@ static ssize_t jesd204b_laneinfo_read(struct device *dev,
 	struct jesd204b_state *st = dev_get_drvdata(dev);
 	int ret;
 	unsigned val1, val2, val3;
-
+#if 0
 
 	val1 = jesd204b_read(st, XLNX_JESD204_REG_ID_L(lane));
 	val2 = jesd204b_read(st, XLNX_JESD204_REG_LANE_F(lane));
@@ -127,6 +128,9 @@ static ssize_t jesd204b_laneinfo_read(struct device *dev,
 	ret += sprintf(buf + ret, "FC: %lu\n", st->rate);
 
 	return ret;
+	#endif
+
+	return 0;
 }
 
 #define JESD_LANE(_x) 						 \
@@ -411,6 +415,7 @@ static int jesd204b_probe(struct platform_device *pdev)
 
 	of_clk_add_provider(pdev->dev.of_node, of_clk_src_simple_get, clk_out);
 
+#if 0
 	val = jesd204b_read(st, XLNX_JESD204_REG_VERSION);
 
 	dev_info(&pdev->dev, "AXI-JESD204B %d.%d Rev %d, at 0x%08llX mapped to 0x%p,",
@@ -418,7 +423,7 @@ static int jesd204b_probe(struct platform_device *pdev)
 		 XLNX_JESD204_VERSION_MINOR(val),
 		 XLNX_JESD204_VERSION_REV(val),
 		 (unsigned long long)mem->start, st->regs);
-
+#endif
 	return 0;
 }
 
