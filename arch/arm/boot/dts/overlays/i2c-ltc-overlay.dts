@@ -1,0 +1,91 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "brcm,bcm2708";
+
+    fragment@0 {
+	target-path="/";
+	__overlay__ {
+		ltc2497_reg: fixedregulator@0 {
+		    compatible = "regulator-fixed";
+		    regulator-name = "vref";
+		    regulator-min-microvolt = <2500000>;
+		    regulator-max-microvolt = <2500000>;
+		};
+	};
+    };
+
+	fragment@1 {
+		target = <&i2c_arm>;
+		__overlay__ {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+
+			ltc2497: adc@76 {
+				compatible = "lltc,ltc2497";
+				reg = <0x76>;
+				vref-supply = <&ltc2497_reg>;
+				status = "okay";
+			};
+
+			ltc4306: mux@4a {
+				compatible = "lltc,ltc4306";
+				reg = <0x4a>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				i2c@0 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <0>;
+
+					eeprom@50 {
+						compatible = "at24,24c02";
+						reg = <0x50>;
+					};
+
+
+				};
+				i2c@1 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <1>;
+					eeprom@51 {
+						compatible = "at24,24c02";
+						reg = <0x51>;
+					};
+
+
+					};
+				i2c@2 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <2>;
+					eeprom@52 {
+						compatible = "at24,24c02";
+						reg = <0x52>;
+					};
+
+
+					};
+				i2c@3 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					reg = <3>;
+					eeprom@53 {
+						compatible = "at24,24c02";
+						reg = <0x53>;
+					};
+
+					};
+			};
+		};
+	};
+
+	__overrides__ {
+		ltc4306 = <&ltc4306>,"status";
+		ltc2497 = <&ltc2497>,"status";
+	};
+};
