@@ -444,12 +444,6 @@ static int adxcvr_clk_register(struct device *dev, struct device_node *node,
 static int adxcvr_parse_dt(struct adxcvr_state *st,
 						   struct device_node *np)
 {
-	bool gth_enable;
-
-	gth_enable = of_property_read_bool(np, "adi,transceiver-gth-enable");
-	st->tx_enable =
-		of_property_read_bool(np, "adi,link-is-transmit-enable");
-
 	of_property_read_u32(np, "adi,sys-clk-select",
 				&st->sys_clk_sel);
 	of_property_read_u32(np, "adi,out-clk-select",
@@ -461,13 +455,6 @@ static int adxcvr_parse_dt(struct adxcvr_state *st,
 				"adi,use-lpm-enable");
 
 	INIT_WORK(&st->work, adxcvr_work_func);
-
-	if (gth_enable)
-		st->xcvr.type = XILINX_XCVR_TYPE_US_GTH3;
-	else
-		st->xcvr.type = XILINX_XCVR_TYPE_S7_GTX2;
-	st->xcvr.encoding = ENC_8B10B;
-	st->xcvr.refclk_ppm = PM_200; /* TODO use clock accuracy */
 
 	return 0;
 }
@@ -502,6 +489,7 @@ static int adxcvr_probe(struct platform_device *pdev)
 	struct adxcvr_state *st;
 	struct resource *mem; /* IO mem resources */
 	unsigned int version;
+	unsigned int synth_conf;
 	int ret;
 
 	st = devm_kzalloc(&pdev->dev, sizeof(*st), GFP_KERNEL);
@@ -557,7 +545,18 @@ static int adxcvr_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
-	dev_info(&pdev->dev, "AXI-ADXCVR (%d.%.2d.%c) at 0x%08llX mapped to 0x%p,",
+	synth_conf = adxcvr_read(st, ADXCVR_REG_SYNTH);
+	st->tx_enable = (synth_conf >> 8) & 1;
+
+	if (synth_conf & 0x1000)
+		st->xcvr.type = XILINX_XCVR_TYPE_US_GTH3;
+	else
+		st->xcvr.type = XILINX_XCVR_TYPE_S7_GTX2;
+	st->xcvr.encoding = ENC_8B10B;
+	st->xcvr.refclk_ppm = PM_200; /* TODO use clock accuracy */
+
+	dev_info(&pdev->dev, "AXI-ADXCVR-%s (%d.%.2d.%c) at 0x%08llX mapped to 0x%p.",
+		st->tx_enable ? "TX" : "RX",
 		PCORE_VER_MAJOR(version),
 		PCORE_VER_MINOR(version),
 		PCORE_VER_LETTER(version),
