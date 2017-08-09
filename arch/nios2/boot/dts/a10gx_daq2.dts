@@ -238,10 +238,9 @@
 				<0x20406000 0x00001000>,
 				<0x20407000 0x00001000>;
 			reg-names = "adxcvr", "atx-pll", "adxcfg-0", "adxcfg-1", "adxcfg-2", "adxcfg-3";
-			adi,delay-work-seconds = <1>;
-			adi,tx-enable;
-			adi,link-number = <0>;
-			adi,lanes-per-link = <4>;
+
+			clocks = <&clk0_ad9523 9>;
+			clock-names = "ref";
 		};
 
 
@@ -253,10 +252,9 @@
 				<0x20506000 0x00001000>,
 				<0x20507000 0x00001000>;
 			reg-names = "adxcvr", "adxcfg-0", "adxcfg-1", "adxcfg-2", "adxcfg-3";
-			adi,delay-work-seconds = <1>;
-			adi,rx-enable;
-			adi,link-number = <0>;
-			adi,lanes-per-link = <4>;
+
+			clocks = <&clk0_ad9523 4>;
+			clock-names = "ref";
 		};
 
 
