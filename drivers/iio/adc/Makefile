@@ -33,10 +33,9 @@ obj-$(CONFIG_ADMC) += admc_adc.o admc_speed.o admc_ctrl.o ad_adc.o
 
 obj-$(CONFIG_CF_AXI_TDD) += cf_axi_tdd.o
 
-obj-$(CONFIG_AXI_JESD204B) += cf_axi_jesd204b_v51.o cf_axi_jesd204b_gt.o cf_axi_adxcvr.o
 obj-$(CONFIG_AXI_FMCADC5_SYNC) += axi_fmcadc5_sync.o
 
-obj-$(CONFIG_ALTERA_XCVR) += altera_xcvr.o altera_adxcvr.o
+obj-$(CONFIG_ALTERA_XCVR) += altera_xcvr.o
 
 obj-$(CONFIG_AT91_ADC) += at91_adc.o
 obj-$(CONFIG_AT91_SAMA5D2_ADC) += at91-sama5d2_adc.o
