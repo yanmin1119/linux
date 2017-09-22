@@ -29,6 +29,10 @@ config IIO_BUFFER_DMAENGINE
 
 	  Should be selected by drivers that want to use this functionality.
 
+config IIO_BUFFER_HW_CONSUMER
+	help
+	  ...
+
 config IIO_KFIFO_BUF
 	tristate "Industrial I/O buffering based on kfifo"
 	help
