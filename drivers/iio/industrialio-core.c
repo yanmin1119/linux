@@ -591,7 +591,7 @@ EXPORT_SYMBOL(of_iio_read_mount_matrix);
  */
 ssize_t iio_format_value(char *buf, unsigned int type, int size, int *vals)
 {
-	unsigned long long tmp;
+	s64 tmp;
 	bool scale_db = false;
 
 	switch (type) {
@@ -618,9 +618,11 @@ ssize_t iio_format_value(char *buf, unsigned int type, int size, int *vals)
 		return sprintf(buf, "%d.%09u\n", vals[0], abs(vals[1]));
 	case IIO_VAL_FRACTIONAL_LOG2:
 		tmp = (s64)vals[0] * 1000000000LL >> vals[1];
-		vals[1] = do_div(tmp, 1000000000LL);
-		vals[0] = tmp;
-		return sprintf(buf, "%d.%09u\n", vals[0], vals[1]);
+		vals[0] = div_s64_rem(tmp, 1000000000LL, &vals[1]);
+		if (vals[1] < 0)
+			return sprintf(buf, "-%d.%09u\n", abs(vals[0]), -vals[1]);
+		else
+			return sprintf(buf, "%d.%09u\n", vals[0], vals[1]);
 	case IIO_VAL_INT_MULTIPLE:
 	{
 		int i;
