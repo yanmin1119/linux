@@ -26,6 +26,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/mm.h>
 #include <linux/debugfs.h>
+#include <linux/wait.h>
 
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
@@ -513,6 +514,7 @@ struct dwc3_event_buffer {
  * @endpoint: usb endpoint
  * @pending_list: list of pending requests for this endpoint
  * @started_list: list of started requests on this endpoint
+ * @wait_end_transfer: wait_queue_head_t for waiting on End Transfer complete
  * @lock: spinlock for endpoint request queue traversal
  * @regs: pointer to first endpoint register
  * @trb_pool: array of transaction buffers
@@ -538,6 +540,8 @@ struct dwc3_ep {
 	struct list_head	pending_list;
 	struct list_head	started_list;
 
+	wait_queue_head_t	wait_end_transfer;
+
 	spinlock_t		lock;
 	void __iomem		*regs;
 
@@ -554,6 +558,7 @@ struct dwc3_ep {
 #define DWC3_EP_BUSY		(1 << 4)
 #define DWC3_EP_PENDING_REQUEST	(1 << 5)
 #define DWC3_EP_MISSED_ISOC	(1 << 6)
+#define DWC3_EP_END_TRANSFER_PENDING	(1 << 7)
 
 	/* This last one is specific to EP0 */
 #define DWC3_EP0_DIR_IN		(1 << 31)
@@ -741,6 +746,7 @@ struct dwc3_request {
 	struct dwc3_trb		*trb;
 	dma_addr_t		trb_dma;
 
+	unsigned		unaligned:1;
 	unsigned		direction:1;
 	unsigned		mapped:1;
 	unsigned		started:1;
@@ -1076,6 +1082,9 @@ struct dwc3_event_depevt {
 #define DEPEVT_TRANSFER_BUS_EXPIRY	2
 
 	u32	parameters:16;
+
+/* For Command Complete Events */
+#define DEPEVT_PARAMETER_CMD(n)	(((n) & (0xf << 8)) >> 8)
 } __packed;
 
 /**

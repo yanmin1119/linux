@@ -179,6 +179,7 @@ void dwc3_gadget_giveback(struct dwc3_ep *dep, struct dwc3_request *req,
 	list_del(&req->list);
 	req->trb = NULL;
 
+
 	if (req->request.status == -EINPROGRESS)
 		req->request.status = status;
 
@@ -588,10 +589,13 @@ int __dwc3_gadget_ep_enable(struct dwc3_ep *dep,
 		dep->comp_desc = comp_desc;
 		dep->type = usb_endpoint_type(desc);
 		dep->flags |= DWC3_EP_ENABLED;
+		dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
 
 		reg = dwc3_readl(dwc->regs, DWC3_DALEPENA);
 		reg |= DWC3_DALEPENA_EP(dep->number);
 		dwc3_writel(dwc->regs, DWC3_DALEPENA, reg);
+
+		init_waitqueue_head(&dep->wait_end_transfer);
 
 		if (usb_endpoint_xfer_control(desc))
 			return 0;
@@ -666,7 +670,7 @@ int __dwc3_gadget_ep_disable(struct dwc3_ep *dep)
 
 	dep->stream_capable = false;
 	dep->type = 0;
-	dep->flags = 0;
+	dep->flags &= DWC3_EP_END_TRANSFER_PENDING;
 
 	return 0;
 }
@@ -1254,6 +1258,67 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 		if (r == req) {
 			/* wait until it is processed */
 			dwc3_stop_active_transfer(dwc, dep->number, true);
+
+			/*
+			 * If request was already started, this means we had to
+			 * stop the transfer. With that we also need to ignore
+			 * all TRBs used by the request, however TRBs can only
+			 * be modified after completion of END_TRANSFER
+			 * command. So what we do here is that we wait for
+			 * END_TRANSFER completion and only after that, we jump
+			 * over TRBs by clearing HWO and incrementing dequeue
+			 * pointer.
+			 *
+			 * Note that we have 2 possible types of transfers here:
+			 *
+			 * i) Linear buffer request
+			 * ii) SG-list based request
+			 *
+			 * SG-list based requests will have r->num_pending_sgs
+			 * set to a valid number (> 0). Linear requests,
+			 * normally use a single TRB.
+			 *
+			 * For each of these two cases, if r->unaligned flag is
+			 * set, one extra TRB has been used to align transfer
+			 * size to wMaxPacketSize.
+			 *
+			 * All of these cases need to be taken into
+			 * consideration so we don't mess up our TRB ring
+			 * pointers.
+			 */
+			wait_event_lock_irq(dep->wait_end_transfer,
+					!(dep->flags & DWC3_EP_END_TRANSFER_PENDING),
+					dwc->lock);
+
+			if (!r->trb)
+				goto out1;
+
+			if (r->num_pending_sgs) {
+				struct dwc3_trb *trb;
+				int i = 0;
+
+				for (i = 0; i < r->num_pending_sgs; i++) {
+					trb = r->trb + i;
+					trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
+					dwc3_ep_inc_deq(dep);
+				}
+
+				if (r->unaligned) {
+					trb = r->trb + r->num_pending_sgs + 1;
+					trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
+					dwc3_ep_inc_deq(dep);
+				}
+			} else {
+				struct dwc3_trb *trb = r->trb;
+				trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
+				dwc3_ep_inc_deq(dep);
+
+				if (r->unaligned) {
+					trb = r->trb + 1;
+					trb->ctrl &= ~DWC3_TRB_CTRL_HWO;
+					dwc3_ep_inc_deq(dep);
+				}
+			}
 			goto out1;
 		}
 		dev_err(dwc->dev, "request %p was not queued to %s\n",
@@ -1264,6 +1329,7 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 
 out1:
 	/* giveback the request */
+	dep->queued_requests--;
 	dwc3_gadget_giveback(dep, req, -ECONNRESET);
 
 out0:
@@ -1290,6 +1356,8 @@ int __dwc3_gadget_ep_set_halt(struct dwc3_ep *dep, int value, int protocol)
 
 		unsigned transfer_in_flight;
 		unsigned started;
+
+		//panic("here");
 
 		if (dep->number > 1)
 			trb = dwc3_ep_prev_trb(dep, dep->trb_enqueue);
@@ -1784,9 +1852,6 @@ err0:
 
 static void __dwc3_gadget_stop(struct dwc3 *dwc)
 {
-	if (pm_runtime_suspended(dwc->dev))
-		return;
-
 	dwc3_gadget_disable_irq(dwc);
 	__dwc3_gadget_ep_disable(dwc->eps[0]);
 	__dwc3_gadget_ep_disable(dwc->eps[1]);
@@ -1796,9 +1861,30 @@ static int dwc3_gadget_stop(struct usb_gadget *g)
 {
 	struct dwc3		*dwc = gadget_to_dwc(g);
 	unsigned long		flags;
+	int			epnum;
 
 	spin_lock_irqsave(&dwc->lock, flags);
+
+	if (pm_runtime_suspended(dwc->dev))
+		goto out;
+
 	__dwc3_gadget_stop(dwc);
+
+	for (epnum = 2; epnum < DWC3_ENDPOINTS_NUM; epnum++) {
+		struct dwc3_ep  *dep = dwc->eps[epnum];
+
+		if (!dep)
+			continue;
+
+		if (!(dep->flags & DWC3_EP_END_TRANSFER_PENDING))
+			continue;
+
+		wait_event_lock_irq(dep->wait_end_transfer,
+				    !(dep->flags & DWC3_EP_END_TRANSFER_PENDING),
+				    dwc->lock);
+	}
+
+out:
 	dwc->gadget_driver	= NULL;
 	spin_unlock_irqrestore(&dwc->lock, flags);
 
@@ -2180,10 +2266,12 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 {
 	struct dwc3_ep		*dep;
 	u8			epnum = event->endpoint_number;
+	u8			cmd;
 
 	dep = dwc->eps[epnum];
 
-	if (!(dep->flags & DWC3_EP_ENABLED))
+	if (!(dep->flags & DWC3_EP_ENABLED) &&
+	    !(dep->flags & DWC3_EP_END_TRANSFER_PENDING))
 		return;
 
 	if (epnum == 0 || epnum == 1) {
@@ -2252,11 +2340,16 @@ static void dwc3_endpoint_interrupt(struct dwc3 *dwc,
 					"unable to find suitable stream");
 		}
 		break;
-	case DWC3_DEPEVT_RXTXFIFOEVT:
-		dwc3_trace(trace_dwc3_gadget, "%s FIFO Overrun", dep->name);
-		break;
+
 	case DWC3_DEPEVT_EPCMDCMPLT:
-		dwc3_trace(trace_dwc3_gadget, "Endpoint Command Complete");
+		cmd = DEPEVT_PARAMETER_CMD(event->parameters);
+
+		if (cmd == DWC3_DEPCMD_ENDTRANSFER) {
+			dep->flags &= ~DWC3_EP_END_TRANSFER_PENDING;
+			wake_up(&dep->wait_end_transfer);
+		}
+		break;
+	case DWC3_DEPEVT_RXTXFIFOEVT:
 		break;
 	}
 }
@@ -2309,7 +2402,8 @@ static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum, bool force)
 
 	dep = dwc->eps[epnum];
 
-	if (!dep->resource_index)
+	if ((dep->flags & DWC3_EP_END_TRANSFER_PENDING) ||
+	    !dep->resource_index)
 		return;
 
 	/*
@@ -2350,17 +2444,14 @@ static void dwc3_stop_active_transfer(struct dwc3 *dwc, u32 epnum, bool force)
 	memset(&params, 0, sizeof(params));
 	ret = dwc3_send_gadget_ep_cmd(dep, cmd, &params);
 	WARN_ON_ONCE(ret);
+	dep->resource_index = 0;
 	dep->flags &= ~DWC3_EP_BUSY;
 
-	/*
-	 * when transfer is stopped with force rm bit false, it can be
-	 * restarted by passing resource_index in params; don't loose it
-	 */
-	if (force)
-		dep->resource_index = 0;
 
-	if (dwc3_is_usb31(dwc) || dwc->revision < DWC3_REVISION_310A)
+	if (dwc3_is_usb31(dwc) || dwc->revision < DWC3_REVISION_310A) {
+		dep->flags |= DWC3_EP_END_TRANSFER_PENDING;
 		udelay(100);
+	}
 }
 
 static void dwc3_stop_active_transfers(struct dwc3 *dwc)
