@@ -3,6 +3,7 @@
 #
 
 ad9361_drv-y := ad9361.o ad9361_conv.o
+ad9361_drv-$(CONFIG_AD9361_EXT_BAND_CONTROL) += ad9361_ext_band_ctrl.o
 ad9371_drv-y := ad9371.o ad9371_conv.o \
 	mykonos/common.o  mykonos/mykonos.o  \
 	mykonos/mykonos_gpio.o  mykonos/mykonos_user.o
